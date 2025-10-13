@@ -384,7 +384,7 @@ namespace KMPExpander
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("KMP Expander v4 Made by Ermelber & PabloMK7");
+            MessageBox.Show("KMP Expander v1.4.1 Made by Ermelber & PabloMK7");
         }
 
         private void saveKMP()
@@ -462,6 +462,8 @@ namespace KMPExpander
                     ((CDAB)e.Node.Tag).SetVisibility(((CDAB)e.Node.Tag).GetVisibility() ? false : true);
                 else if (e.Node.Tag is CDAB.STRM)
                     ((CDAB.STRM)e.Node.Tag).SetVisibility(((CDAB.STRM)e.Node.Tag).GetVisibility() ? false : true);
+                else if (e.Node.Tag is CDAB.STRM.STRMEntry)
+                    ((CDAB.STRM.STRMEntry)e.Node.Tag).SetVisibility(((CDAB.STRM.STRMEntry)e.Node.Tag).GetVisibility() ? false : true);
                 Render();
             }
         }
@@ -916,7 +918,7 @@ namespace KMPExpander
         public Vector2 ViewportOffset;
         public SectionPicking.PickingInfo PickingInfo;
         private object AddingPencil = null;
-        private float found_height = 0;
+        private Nullable<float> found_height = 0;
 
         private void simpleOpenGlControl1_Load(object sender, EventArgs e)
         {
@@ -1061,6 +1063,7 @@ namespace KMPExpander
 
         private void PickPoint(Point mousepoint = new Point(), bool getY = false)
         {
+            found_height = null;
             if (!opengl_initialized) return;
             
             byte[] pic = new byte[4] { 0xFF, 0xFF, 0xFF, 0xFF };
@@ -1070,42 +1073,47 @@ namespace KMPExpander
             Gl.glDisable(Gl.GL_POLYGON_SMOOTH);
             Gl.glDisable(Gl.GL_POINT_SMOOTH);
 
-            if (getY && (OBJModel!=null))
+            if (UIMapPos != null) UIMapPos.Render(true);
+            if (Kayempee != null)
             {
-                OBJModel.Render(true);
-                Gl.glReadPixels(mousepoint.X, simpleOpenGlControl1.Height - mousepoint.Y, 1, 1, Gl.GL_BGRA, Gl.GL_UNSIGNED_BYTE, pic);
-
-                if (pic[0] == 0xFF && pic[1] == 0xFF && pic[2] == 0xFF && pic[3] == 0xFF)
+                if (adding_checkpoint)
                 {
-                    return;
+                    Gl.glBindTexture(Gl.GL_TEXTURE_2D, 0);
+                    Kayempee.CheckPoints.Render(true);
                 }
-                int face_id = ModelPicking.FromRgb(pic[2], pic[1], pic[0]);
-                found_height = OBJModel.GetHeightValue(face_id, GetPosition(mousepoint));
+                else Kayempee.Render(true);
+            }
+            Gl.glReadPixels(mousepoint.X, simpleOpenGlControl1.Height - mousepoint.Y, 1, 1, Gl.GL_BGRA, Gl.GL_UNSIGNED_BYTE, pic);
+
+            if (pic[0] == 0xFF && pic[1] == 0xFF && pic[2] == 0xFF && pic[3] == 0xFF)
+            {
+                PickingInfo.Section = Sections.None;
+                PickingInfo.PointID = PointID.None;
+                PickingInfo.GroupID = 0;
+                PickingInfo.EntryID = 0;
             }
             else
-            {
-                if (UIMapPos != null) UIMapPos.Render(true);
-                if (Kayempee != null)
-                {
-                    if (adding_checkpoint)
-                    {
-                        Gl.glBindTexture(Gl.GL_TEXTURE_2D, 0);
-                        Kayempee.CheckPoints.Render(true);
-                    }
-                    else Kayempee.Render(true);
-                }
-                Gl.glReadPixels(mousepoint.X, simpleOpenGlControl1.Height - mousepoint.Y, 1, 1, Gl.GL_BGRA, Gl.GL_UNSIGNED_BYTE, pic);
+                PickingInfo = SectionPicking.FromRgb(pic[2], pic[1], pic[0]);
 
-                if (pic[0] == 0xFF && pic[1] == 0xFF && pic[2] == 0xFF && pic[3] == 0xFF)
+            if (getY && (OBJModel!=null))
+            {
+                var picked_pos = Kayempee.GetPointPosition(PickingInfo);
+                if (picked_pos != null)
                 {
-                    PickingInfo.Section = Sections.None;
-                    PickingInfo.PointID = PointID.None;
-                    PickingInfo.GroupID = 0;
-                    PickingInfo.EntryID = 0;
+                    Gl.glClear(Gl.GL_COLOR_BUFFER_BIT | Gl.GL_DEPTH_BUFFER_BIT);
+                    Point screen_point = GetScreenPoint(picked_pos.Value);
+                    OBJModel.Render(true);
+                    Gl.glReadPixels(screen_point.X, simpleOpenGlControl1.Height - screen_point.Y, 1, 1, Gl.GL_BGRA, Gl.GL_UNSIGNED_BYTE, pic);
+
+                    if (pic[0] == 0xFF && pic[1] == 0xFF && pic[2] == 0xFF && pic[3] == 0xFF)
+                    {
+                        return;
+                    }
+                    int face_id = ModelPicking.FromRgb(pic[2], pic[1], pic[0]);
+                    found_height = OBJModel.GetHeightValue(face_id, picked_pos.Value);
                 }
-                else
-                    PickingInfo = SectionPicking.FromRgb(pic[2], pic[1], pic[0]);
             }
+            
             Gl.glClear(Gl.GL_COLOR_BUFFER_BIT | Gl.GL_DEPTH_BUFFER_BIT);
             Render();
             return;
@@ -1113,19 +1121,26 @@ namespace KMPExpander
 
         private void simpleOpenGlControl1_MouseDown(object sender, MouseEventArgs e)
         {
-            if (e.Button != MouseButtons.Left && e.Button != MouseButtons.Right) return;
+            
+            if (e.Button == MouseButtons.Right && vph.mode == ViewPlaneHandler.PLANE_MODES.XZ)
+            {
+                start_move = true;
+                PickPoint(e.Location, true);
+                if (OBJModel != null && found_height != null) Kayempee.MovePointY(PickingInfo, found_height.Value);
+                SelectedDots.Clear();
+                if (PickingInfo.Section != Sections.None && PickingInfo.Section != Sections.LocalMap && PickingInfo.Section != Sections.GlobalMap)
+                    SelectedDots.Add(Kayempee.GetPoint(PickingInfo));
+                return;
+            }
+
+            if (e.Button != MouseButtons.Left) return;
 
             if (pencil_mode && (lastSelectedGroup != null))
             {
                 if (vph.mode != ViewPlaneHandler.PLANE_MODES.XZ && (lastSelectedGroup.GetType() == typeof(CheckPoints.CheckpointGroup) || lastSelectedGroup.GetType() == typeof(Area))) return;
                 Vector3 Position = GetPosition(e.Location);
                 AddingPencil = AddEntry();
-                if ((OBJModel != null) && vph.mode == ViewPlaneHandler.PLANE_MODES.XZ && (e.Button == MouseButtons.Right))
-                {
-                    PickPoint(e.Location, true);
-                    Position.Y = found_height;
-                }
-                else Position.Y = 0f;
+                Position.Y = 0f;
                 if (lastSelectedGroup.GetType() == typeof(CheckPoints.CheckpointGroup)) Kayempee.MoveAnyPoint(AddingPencil, Position, true);
                 Kayempee.MoveAnyPoint(AddingPencil, Position);
                 dataGridView1.DataSource = lastSelectedGroup.GetEntries();
@@ -1159,7 +1174,7 @@ namespace KMPExpander
 
         private void simpleOpenGlControl1_MouseMove(object sender, MouseEventArgs e)
         {
-            if ((e.Button == MouseButtons.Left || (e.Button == MouseButtons.Right)))
+            if (e.Button == MouseButtons.Left)
             {
                 Vector3 position = GetPosition(e.Location);
                 if (!start_move) return;
@@ -1186,11 +1201,6 @@ namespace KMPExpander
                 return;
             }
 
-            if (e.Button == MouseButtons.Right && vph.mode == ViewPlaneHandler.PLANE_MODES.XZ)
-            {
-                PickPoint(e.Location, true);
-                if (OBJModel!=null) Kayempee.MovePointY(PickingInfo, found_height);
-            }
             ExpandTreeView();
             if (PickingInfo.Section == Sections.None) dataGridView1.ClearSelection();
             start_move = false;
@@ -1376,6 +1386,17 @@ namespace KMPExpander
             Pos.X = (float)mouse_point.X * dX + r.Left;
             Pos.Z = (float)mouse_point.Y * dY + r.Top;
             return Pos;
+        }
+
+        public Point GetScreenPoint(Vector3 worldPos)
+        {
+            RectangleF r = getDisplayRectangle(true);
+            float dX = r.Width / simpleOpenGlControl1.Width;
+            float dY = r.Height / simpleOpenGlControl1.Height;
+            Point p = new Point();
+            p.X = (int)((worldPos.X - r.Left) / dX);
+            p.Y = (int)((worldPos.Z - r.Top) / dY);
+            return p;
         }
 
         public void populateTreeView()

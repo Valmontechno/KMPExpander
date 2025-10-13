@@ -250,6 +250,45 @@ namespace KMPExpander.Class
             }
         }
 
+        public Nullable<Vector3> GetPointPosition(SectionPicking.PickingInfo pick_info)
+        {
+            switch (pick_info.Section)
+            {
+                case Sections.StartPositions:
+                    return StartPositions.Entries[pick_info.EntryID].Pos;
+                case Sections.EnemyRoutes:
+                    return EnemyRoutes.Entries[pick_info.GroupID].Entries[pick_info.EntryID].Pos;
+                case Sections.ItemRoutes:
+                    return ItemRoutes.Entries[pick_info.GroupID].Entries[pick_info.EntryID].Pos;
+                case Sections.GliderRoutes:
+                    return GliderRoutes.Entries[pick_info.GroupID].Entries[pick_info.EntryID].Pos;
+                case Sections.Routes:
+                    return Routes.Entries[pick_info.GroupID].Entries[pick_info.EntryID].Pos;
+                case Sections.CheckPoints:
+                    switch(pick_info.PointID)
+                    {
+                        case PointID.Left:
+                            return new Vector3(CheckPoints.Entries[pick_info.GroupID].Entries[pick_info.EntryID].LeftPointX, 0, CheckPoints.Entries[pick_info.GroupID].Entries[pick_info.EntryID].LeftPointZ);
+                        case PointID.Right:
+                            return new Vector3(CheckPoints.Entries[pick_info.GroupID].Entries[pick_info.EntryID].RightPointX, 0, CheckPoints.Entries[pick_info.GroupID].Entries[pick_info.EntryID].RightPointZ);
+                        default:
+                            return null;
+                    }                    
+                case Sections.Objects:
+                    return Objects.Entries[pick_info.EntryID].Pos;
+                case Sections.RespawnPoints:
+                    return RespawnPoints.Entries[pick_info.EntryID].Pos;
+                case Sections.Area:
+                    return Area.Entries[pick_info.EntryID].Pos;
+                case Sections.Camera:
+                    return Camera.Entries[pick_info.EntryID].Pos;
+                case Sections.StageInformation:
+                    return null;
+                default:
+                    return null;
+            }
+        }
+
         public object GetPoint(SectionPicking.PickingInfo pick_info)
         {
             switch (pick_info.Section)

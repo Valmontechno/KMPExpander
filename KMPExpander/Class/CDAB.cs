@@ -156,6 +156,7 @@ namespace KMPExpander.Class
                     maxX = er.ReadSingle();
                     maxZ = er.ReadSingle();
                     area = (maxX - minX) * (maxZ - minZ);
+                    isVisible = true;
                 }
                 public STRMEntry(Single minx, Single minz, Single maxx, Single maxz)
                 {
@@ -176,15 +177,16 @@ namespace KMPExpander.Class
                         poly.Add(new Extensions.pointInPoly.Point(en.PositionX, en.PositionZ));
                     }
                     Extensions.pointInPoly.Point[] arr = poly.ToArray();
-                    if (Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(minX, minZ)) ||
-                        Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(minX, maxZ)) ||
-                        Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(maxX, maxZ)) ||
+                    if (Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(minX, minZ)) &&
+                        Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(minX, maxZ)) &&
+                        Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(maxX, maxZ)) &&
                         Extensions.pointInPoly.isInside(arr, 4, new Extensions.pointInPoly.Point(maxX, minZ)))
                         return true;
                     return false;
                 }
-                public void Render(int count, float single)
+                public void Render()
                 {
+                    if (!GetVisibility()) return;
 
                     VisualSettings Settings = (Application.OpenForms[0] as Form1).Settings;
                     SimpleKMP kmp = (Application.OpenForms[0] as Form1).getKayEmPee();
@@ -232,6 +234,16 @@ namespace KMPExpander.Class
                     er.Write(maxX);
                     er.Write(maxZ);
                 }
+
+                private bool isVisible;
+                public bool GetVisibility()
+                {
+                    return isVisible;
+                }
+                public void SetVisibility(bool visible)
+                {
+                    isVisible = visible;
+                }
             }
 		}
         public void addSTRM(STRM s)
@@ -261,11 +273,10 @@ namespace KMPExpander.Class
                 Gl.glLoadIdentity();
             }
             for (int i = 0; i < Shape.NrStreams; i++) {
-                float single = 1.0f / Streams[i].NrEntries;
                 for (int j = 0; j < Streams[i].NrEntries; j++)
                 {
                     if (!Streams[i].GetVisibility()) continue;
-                    Streams[i].Entries[j].Render(j + 1, single);
+                    Streams[i].Entries[j].Render();
                 }
             }
         }
@@ -292,10 +303,17 @@ namespace KMPExpander.Class
             int i = 0;
             foreach (var group in Streams)
             {
-                node.Nodes.Add("Group " + i.ToString());
+                node.Nodes.Add("Group " + i.ToString() + " (" + group.VertexCount.ToString() + "v)");
                 node.Nodes[i].Tag = group;
                 node.Nodes[i].ImageIndex = 18;
                 node.Nodes[i].SelectedImageIndex = 18;
+                int j = 0;
+                foreach (var entry in group.Entries)
+                {
+                    node.Nodes[i].Nodes.Add("Entry " + j.ToString());
+                    node.Nodes[i].Nodes[j].Tag = entry;
+                    j++;
+                }
                 i++;
             }
             return node;
@@ -318,7 +336,13 @@ namespace KMPExpander.Class
                 {
                     node.Checked = ((CDAB)node.Tag).GetVisibility();
                     foreach (TreeNode subnode in node.Nodes)
+                    {
                         subnode.Checked = ((STRM)subnode.Tag).GetVisibility();
+                        foreach (TreeNode subsubnode in subnode.Nodes)
+                        {
+                            subsubnode.Checked = ((STRM.STRMEntry)subsubnode.Tag).GetVisibility();
+                        }
+                    }
                 }
             }
         }
