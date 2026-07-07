@@ -979,7 +979,7 @@ namespace KMPExpander
         {
             bool positive = e.Delta >= 0;
 
-            if ((ModifierKeys & Keys.Control) > 0)
+            if ((ModifierKeys & (Keys.Shift | Keys.Control)) == 0)
             {
                 doScroll(positive);
             }
@@ -989,7 +989,7 @@ namespace KMPExpander
 
                 if ((ModifierKeys & Keys.Shift) > 0)
                     hScrollBar1.Value = clamp((int)(hScrollBar1.Value - getViewportLevel() * speed), hScrollBar1.Minimum, hScrollBar1.Maximum);
-                else
+                else if ((ModifierKeys & Keys.Control) > 0)
                     vScrollBar1.Value = clamp((int)(vScrollBar1.Value - getViewportLevel() * speed), vScrollBar1.Minimum, vScrollBar1.Maximum);
 
                 ViewportOffset = new Vector2(hScrollBar1.Value, vScrollBar1.Value);
