@@ -1229,6 +1229,8 @@ namespace KMPExpander
 
         private void simpleOpenGlControl1_MouseUp(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Middle) return;
+
             Render();
             if (pencil_mode)
             {
